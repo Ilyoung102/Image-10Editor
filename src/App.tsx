@@ -929,22 +929,105 @@ export default function App() {
 
   const onSaveSelectedImage = (targetObj?: any) => {
     const canvas = fabricCanvasRef.current;
-    const activeObj = targetObj || canvas?.getActiveObject() || activeLayer;
+    if (!canvas) return;
+
+    const activeObj = targetObj || canvas.getActiveObject() || activeLayer;
     if (!activeObj) {
       showToast('저장할 레이어를 선택해주세요.');
       return;
     }
-    const dataURL = activeObj.toDataURL({
-      format: 'png',
-      multiplier: 2,
-    });
-    const link = document.createElement('a');
-    link.download = 'Image_10editor.png';
-    link.href = dataURL;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('선택한 레이어가 Image_10editor.png 이미지로 바로 저장되었습니다.');
+
+    try {
+      // 1. Save original visibilities & background
+      const allObjects = canvas.getObjects();
+      const originalStates = allObjects.map((obj: any) => ({
+        obj,
+        visible: obj.visible,
+      }));
+
+      // Keep only active object (or selection of objects) visible
+      const isSelection = activeObj.type === 'activeSelection';
+      const selectionObjects = isSelection ? activeObj._objects : [];
+
+      allObjects.forEach((obj: any) => {
+        if (obj === activeObj) {
+          obj.visible = true;
+        } else if (isSelection && selectionObjects.includes(obj)) {
+          obj.visible = true;
+        } else {
+          obj.visible = false;
+        }
+      });
+
+      const originalBgColor = canvas.backgroundColor;
+      const originalBgImage = canvas.backgroundImage;
+      canvas.backgroundColor = 'transparent';
+      canvas.backgroundImage = null;
+
+      // 2. Save original zoom & pan viewport transform
+      const originalZoom = canvas.getZoom();
+      const originalVP = canvas.viewportTransform ? [...canvas.viewportTransform] : null;
+
+      // Temporarily reset zoom & pan to 1:1 for pixel-perfect bounding box matches
+      canvas.setZoom(1);
+      canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+      canvas.renderAll();
+
+      // 3. Now get the pixel-perfect bounding rectangle of the active layer
+      const rect = activeObj.getBoundingRect(true, true);
+
+      let dataURL = '';
+      if (rect.width > 0 && rect.height > 0) {
+        try {
+          // Export cropped area directly using the native canvas.toDataURL bounds
+          dataURL = canvas.toDataURL({
+            format: 'png',
+            left: Math.max(0, rect.left),
+            top: Math.max(0, rect.top),
+            width: Math.min(canvas.width - rect.left, rect.width),
+            height: Math.min(canvas.height - rect.top, rect.height),
+            multiplier: 2, // High resolution 2x scale
+          });
+        } catch (cropErr) {
+          console.warn('Cropped export failed, trying fallback:', cropErr);
+        }
+      }
+
+      // If cropping failed or bounds are zero, fallback to standard object toDataURL
+      if (!dataURL && typeof activeObj.toDataURL === 'function') {
+        dataURL = activeObj.toDataURL({
+          format: 'png',
+          multiplier: 2,
+        });
+      }
+
+      // 4. Restore original visibility, background, zoom & pan
+      originalStates.forEach((item: any) => {
+        item.obj.visible = item.visible;
+      });
+      canvas.backgroundColor = originalBgColor;
+      canvas.backgroundImage = originalBgImage;
+
+      if (originalVP) canvas.viewportTransform = originalVP;
+      canvas.setZoom(originalZoom);
+      canvas.renderAll();
+
+      // 5. Download the image file immediately
+      if (!dataURL) {
+        throw new Error('Failed to generate PNG image data URL');
+      }
+
+      const link = document.createElement('a');
+      link.download = 'Image_10editor.png';
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('선택한 레이어가 Image_10editor.png 이미지로 바로 저장되었습니다.');
+    } catch (err: any) {
+      console.error('Save selected image failed:', err);
+      showToast('레이어 저장 오류: 파일 저장 권한 혹은 CORS 허용이 필요합니다.');
+    }
   };
 
   const handleLayerContextMenu = (e: React.MouseEvent, layer: any, index: number) => {
