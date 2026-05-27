@@ -938,83 +938,96 @@ export default function App() {
     }
 
     try {
-      // 1. Save original visibilities & background
-      const allObjects = canvas.getObjects();
-      const originalStates = allObjects.map((obj: any) => ({
-        obj,
-        visible: obj.visible,
-      }));
+      // 1. We clone the object to get a clean copy with absolute coordinates,
+      // completely isolated from active selections, rendering borders, controls, or canvas-level zoom.
+      activeObj.clone((cloned: any) => {
+        try {
+          if (!cloned) {
+            throw new Error('Cloned object is null');
+          }
 
-      // Keep only active object (or selection of objects) visible
-      const isSelection = activeObj.type === 'activeSelection';
-      const selectionObjects = isSelection ? activeObj._objects : [];
+          // In case the cloned object is a group or active selection, associate its canvas context
+          if (cloned.type === 'activeSelection') {
+            cloned.canvas = canvas;
+          }
 
-      allObjects.forEach((obj: any) => {
-        if (obj === activeObj) {
-          obj.visible = true;
-        } else if (isSelection && selectionObjects.includes(obj)) {
-          obj.visible = true;
-        } else {
-          obj.visible = false;
+          // 2. Generate standard high-resolution data URL from cloned, isolated object
+          const dataURL = cloned.toDataURL({
+            format: 'png',
+            multiplier: 2, // High resolution crisp export (2x)
+          });
+
+          if (!dataURL) {
+            throw new Error('DataURL generation returned empty');
+          }
+
+          // 3. Immediately trigger immediate file download
+          const link = document.createElement('a');
+          link.download = 'Image_10editor.png';
+          link.href = dataURL;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          showToast('선택한 레이어가 Image_10editor.png 이미지로 바로 저장되었습니다.');
+        } catch (cloneExportErr) {
+          console.warn('Clone-based download failed, using fallback:', cloneExportErr);
+          fallbackCanvasCroppedExport(activeObj);
         }
       });
+    } catch (err) {
+      console.warn('Clone failed, using fallback:', err);
+      fallbackCanvasCroppedExport(activeObj);
+    }
+  };
+
+  const fallbackCanvasCroppedExport = (activeObj: any) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+
+    try {
+      // Temporarily store selection, viewport, zoom, background state
+      const originalActive = canvas.getActiveObject();
+      canvas.discardActiveObject();
 
       const originalBgColor = canvas.backgroundColor;
       const originalBgImage = canvas.backgroundImage;
       canvas.backgroundColor = 'transparent';
       canvas.backgroundImage = null;
 
-      // 2. Save original zoom & pan viewport transform
       const originalZoom = canvas.getZoom();
       const originalVP = canvas.viewportTransform ? [...canvas.viewportTransform] : null;
 
-      // Temporarily reset zoom & pan to 1:1 for pixel-perfect bounding box matches
+      // Render at Zoom = 1, untransformed coordinates
       canvas.setZoom(1);
       canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
       canvas.renderAll();
 
-      // 3. Now get the pixel-perfect bounding rectangle of the active layer
+      // Retrieve precise bounding rectangle
       const rect = activeObj.getBoundingRect(true, true);
 
-      let dataURL = '';
-      if (rect.width > 0 && rect.height > 0) {
-        try {
-          // Export cropped area directly using the native canvas.toDataURL bounds
-          dataURL = canvas.toDataURL({
-            format: 'png',
-            left: Math.max(0, rect.left),
-            top: Math.max(0, rect.top),
-            width: Math.min(canvas.width - rect.left, rect.width),
-            height: Math.min(canvas.height - rect.top, rect.height),
-            multiplier: 2, // High resolution 2x scale
-          });
-        } catch (cropErr) {
-          console.warn('Cropped export failed, trying fallback:', cropErr);
-        }
-      }
-
-      // If cropping failed or bounds are zero, fallback to standard object toDataURL
-      if (!dataURL && typeof activeObj.toDataURL === 'function') {
-        dataURL = activeObj.toDataURL({
-          format: 'png',
-          multiplier: 2,
-        });
-      }
-
-      // 4. Restore original visibility, background, zoom & pan
-      originalStates.forEach((item: any) => {
-        item.obj.visible = item.visible;
+      // Generate data URL of custom cropped canvas field directly
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        left: Math.max(0, rect.left),
+        top: Math.max(0, rect.top),
+        width: Math.min(canvas.width - rect.left, rect.width),
+        height: Math.min(canvas.height - rect.top, rect.height),
+        multiplier: 2,
       });
+
+      // Restore stored canvas properties and selection
       canvas.backgroundColor = originalBgColor;
       canvas.backgroundImage = originalBgImage;
-
       if (originalVP) canvas.viewportTransform = originalVP;
       canvas.setZoom(originalZoom);
+
+      if (originalActive) {
+        canvas.setActiveObject(originalActive);
+      }
       canvas.renderAll();
 
-      // 5. Download the image file immediately
       if (!dataURL) {
-        throw new Error('Failed to generate PNG image data URL');
+        throw new Error('Fallback dataURL empty');
       }
 
       const link = document.createElement('a');
@@ -1025,7 +1038,7 @@ export default function App() {
       document.body.removeChild(link);
       showToast('선택한 레이어가 Image_10editor.png 이미지로 바로 저장되었습니다.');
     } catch (err: any) {
-      console.error('Save selected image failed:', err);
+      console.error('Fallback export failed:', err);
       showToast('레이어 저장 오류: 파일 저장 권한 혹은 CORS 허용이 필요합니다.');
     }
   };
