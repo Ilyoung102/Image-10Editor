@@ -1,0 +1,6 @@
+{
+  "name": "AI Image Editor Pro",
+  "description": "Pro-level HTML5 canvas image and PDF editor with AI Generative Fill, Background Removal, Smart Analysis, and Magic Wand tool capabilities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
