@@ -927,9 +927,9 @@ export default function App() {
     }
   };
 
-  const onSaveSelectedImage = () => {
+  const onSaveSelectedImage = (targetObj?: any) => {
     const canvas = fabricCanvasRef.current;
-    const activeObj = canvas?.getActiveObject();
+    const activeObj = targetObj || canvas?.getActiveObject() || activeLayer;
     if (!activeObj) {
       showToast('저장할 레이어를 선택해주세요.');
       return;
@@ -939,10 +939,12 @@ export default function App() {
       multiplier: 2,
     });
     const link = document.createElement('a');
-    link.download = `layer-${activeObj.type || 'layer'}.png`;
+    link.download = 'Image_10editor.png';
     link.href = dataURL;
+    document.body.appendChild(link);
     link.click();
-    showToast('선택한 레이어가 개별 이미지로 저장되었습니다.');
+    document.body.removeChild(link);
+    showToast('선택한 레이어가 Image_10editor.png 이미지로 바로 저장되었습니다.');
   };
 
   const handleLayerContextMenu = (e: React.MouseEvent, layer: any, index: number) => {
@@ -970,21 +972,29 @@ export default function App() {
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
 
-    // Use standard pointer of the viewport to detect right clicked object on canvas
-    const pointer = canvas.getPointer(e.nativeEvent);
-    const targets = canvas.getObjects();
-    let clickedObj: any = null;
+    // Use standard finder in fabric
+    let clickedObj: any = canvas.findTarget ? canvas.findTarget(e.nativeEvent, false) : null;
 
-    // Reverse iterate to find topmost target under click position
-    for (let i = targets.length - 1; i >= 0; i--) {
-      const obj = targets[i];
-      if (obj.stroke === 'rgba(255, 0, 0, 0.5)' || obj.name === 'tempSelection' || !obj.visible) {
-        continue;
+    // Fallback manual point check in case findTarget didn't match
+    if (!clickedObj) {
+      const pointer = canvas.getPointer(e.nativeEvent);
+      const targets = canvas.getObjects();
+      const point = new fabric.Point(pointer.x, pointer.y);
+
+      for (let i = targets.length - 1; i >= 0; i--) {
+        const obj = targets[i];
+        if (obj.stroke === 'rgba(255, 0, 0, 0.5)' || obj.name === 'tempSelection' || !obj.visible) {
+          continue;
+        }
+        if (obj.containsPoint && obj.containsPoint(point)) {
+          clickedObj = obj;
+          break;
+        }
       }
-      // Check if coordinate point is inside object boundaries
-      if (canvas.containsPoint(e.nativeEvent, obj) || obj.containsPoint(pointer)) {
-        clickedObj = obj;
-        break;
+    } else {
+      // Filter out helper or invisible objects
+      if (clickedObj.stroke === 'rgba(255, 0, 0, 0.5)' || clickedObj.name === 'tempSelection' || !clickedObj.visible) {
+        clickedObj = null;
       }
     }
 
@@ -2576,7 +2586,7 @@ export default function App() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSaveSelectedImage();
+                onSaveSelectedImage(activeLayer);
                 setContextMenu({ ...contextMenu, visible: false });
               }}
               disabled={!activeLayer}
@@ -2585,7 +2595,7 @@ export default function App() {
               }`}
             >
               <Download size={13} className="text-purple-400" />
-              <span>선택 이미지 저장</span>
+              <span>선택된 레이어 저장</span>
             </button>
             <button
               onClick={(e) => {
