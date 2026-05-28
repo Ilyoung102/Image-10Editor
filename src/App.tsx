@@ -2599,6 +2599,9 @@ export default function App() {
             e.preventDefault();
             e.stopPropagation();
           }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
         >
           {/* Section 1: Copy / Paste */}
           <div className="py-1">
