@@ -254,10 +254,43 @@ export default function App() {
     // Sync state helpers on fabric events
     const syncState = () => {
       const allObjects = canvas.getObjects();
+      const marqueeExists = allObjects.some((o: any) => o.isSelectionMask || o.id === 'selection-marquee');
+      const actObj = canvas.getActiveObject();
+
+      canvas.forEachObject((obj: any) => {
+        if (marqueeExists) {
+          if (obj === actObj && obj && !obj.isSelectionMask && obj.id !== 'selection-marquee') {
+            obj.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+            });
+          } else {
+            obj.set({
+              selectable: false,
+              evented: false,
+              hasControls: false,
+            });
+          }
+        } else {
+          if (obj.isSelectionMask || obj.id === 'selection-marquee') {
+            obj.set({
+              selectable: false,
+              evented: false,
+            });
+          } else {
+            obj.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+            });
+          }
+        }
+      });
+
       const visibleLayers = allObjects.filter((o: any) => !o.isSelectionMask && o.id !== 'selection-marquee');
       setLayers([...visibleLayers]);
 
-      const actObj = canvas.getActiveObject();
       if (actObj && (actObj.isSelectionMask || actObj.id === 'selection-marquee')) {
         setActiveLayer(null);
       } else {
@@ -321,6 +354,15 @@ export default function App() {
           }
         });
 
+        // Close lasso path correctly
+        if (path.path && path.path.length > 0) {
+          const firstPoint = path.path[0];
+          if (firstPoint) {
+            path.path.push(['L', firstPoint[1], firstPoint[2]]);
+            path.path.push(['Z']);
+          }
+        }
+
         path.set({
           fill: 'rgba(0, 120, 215, 0.15)',
           stroke: '#0078d7',
@@ -332,10 +374,42 @@ export default function App() {
           isSelectionMask: true,
         });
 
-        setActiveTool('select');
-        canvas.renderAll();
-        showToast('올가미 선택 영역이 완성되었습니다.');
-        syncState();
+        const activeObj = canvas.getActiveObject();
+        if (activeObj) {
+          activeObj.clone((clonedMask: any) => {
+            clonedMask.set({
+              absolutePositioned: true,
+            });
+            path.set({
+              clipPath: clonedMask,
+            });
+            setActiveTool('select');
+            canvas.renderAll();
+            showToast('올가미 선택 영역이 완성되었습니다.');
+            syncState();
+          });
+        } else {
+          setActiveTool('select');
+          canvas.renderAll();
+          showToast('올가미 선택 영역이 완성되었습니다.');
+          syncState();
+        }
+      } else if (currentTool === 'brush') {
+        const marquee = canvas.getObjects().find((obj: any) => obj.isSelectionMask || obj.id === 'selection-marquee');
+        if (marquee) {
+          marquee.clone((clonedMarquee: any) => {
+            clonedMarquee.set({
+              absolutePositioned: true,
+            });
+            e.path.set({
+              clipPath: clonedMarquee,
+            });
+            canvas.renderAll();
+            saveHistory('Add Brush Stroke');
+          });
+        } else {
+          saveHistory('Add Brush Stroke');
+        }
       } else if (currentTool === 'spot-healing') {
         runSpotHealing(e.path);
       }
@@ -435,11 +509,28 @@ export default function App() {
           }
           polygonPointsRef.current = [];
 
-          canvas.add(poly);
-          setActiveTool('select');
-          canvas.renderAll();
-          showToast('다각형 선택 영역이 완성되었습니다.');
-          syncState();
+          const activeObj = canvas.getActiveObject();
+          if (activeObj) {
+            activeObj.clone((clonedMask: any) => {
+              clonedMask.set({
+                absolutePositioned: true,
+              });
+              poly.set({
+                clipPath: clonedMask,
+              });
+              canvas.add(poly);
+              setActiveTool('select');
+              canvas.renderAll();
+              showToast('다각형 선택 영역이 완성되었습니다.');
+              syncState();
+            });
+          } else {
+            canvas.add(poly);
+            setActiveTool('select');
+            canvas.renderAll();
+            showToast('다각형 선택 영역이 완성되었습니다.');
+            syncState();
+          }
         } else {
           pts.push({ x: pointer.x, y: pointer.y });
 
@@ -632,55 +723,61 @@ export default function App() {
       if (!selectionShapeRef.current) return;
 
       if (tool === 'marquee-rect') {
-        const bounds = selectionShapeRef.current.getBoundingRect();
-        canvas.remove(selectionShapeRef.current);
-
-        const rectSel = new fabric.Rect({
-          left: bounds.left,
-          top: bounds.top,
-          width: bounds.width,
-          height: bounds.height,
-          fill: 'rgba(0, 120, 215, 0.15)',
-          stroke: '#0078d7',
-          strokeWidth: 1.5,
-          strokeDashArray: [4, 4],
-          selectable: false,
-          evented: false,
+        const rectSel = selectionShapeRef.current;
+        rectSel.set({
           id: 'selection-marquee',
           isSelectionMask: true,
         });
-
-        canvas.add(rectSel);
         selectionShapeRef.current = null;
-        setActiveTool('select');
-        canvas.renderAll();
-        showToast('사각 선택 영역이 완성되었습니다.');
-        syncState();
+
+        const activeObj = canvas.getActiveObject();
+        if (activeObj) {
+          activeObj.clone((clonedMask: any) => {
+            clonedMask.set({
+              absolutePositioned: true,
+            });
+            rectSel.set({
+              clipPath: clonedMask,
+            });
+            setActiveTool('select');
+            canvas.renderAll();
+            showToast('사각 선택 영역이 완성되었습니다.');
+            syncState();
+          });
+        } else {
+          setActiveTool('select');
+          canvas.renderAll();
+          showToast('사각 선택 영역이 완성되었습니다.');
+          syncState();
+        }
       } else if (tool === 'marquee-ellipse') {
-        const bounds = selectionShapeRef.current.getBoundingRect();
-        canvas.remove(selectionShapeRef.current);
-
-        const ellSel = new fabric.Ellipse({
-          left: bounds.left,
-          top: bounds.top,
-          rx: bounds.width / 2,
-          ry: bounds.height / 2,
-          fill: 'rgba(0, 120, 215, 0.15)',
-          stroke: '#0078d7',
-          strokeWidth: 1.5,
-          strokeDashArray: [4, 4],
-          selectable: false,
-          evented: false,
+        const ellSel = selectionShapeRef.current;
+        ellSel.set({
           id: 'selection-marquee',
           isSelectionMask: true,
         });
-
-        canvas.add(ellSel);
         selectionShapeRef.current = null;
-        setActiveTool('select');
-        canvas.renderAll();
-        showToast('원형 선택 영역이 완성되었습니다.');
-        syncState();
+
+        const activeObj = canvas.getActiveObject();
+        if (activeObj) {
+          activeObj.clone((clonedMask: any) => {
+            clonedMask.set({
+              absolutePositioned: true,
+            });
+            ellSel.set({
+              clipPath: clonedMask,
+            });
+            setActiveTool('select');
+            canvas.renderAll();
+            showToast('원형 선택 영역이 완성되었습니다.');
+            syncState();
+          });
+        } else {
+          setActiveTool('select');
+          canvas.renderAll();
+          showToast('원형 선택 영역이 완성되었습니다.');
+          syncState();
+        }
       } else if (tool === 'line-draw') {
         const line = selectionShapeRef.current;
         line.setCoords();
@@ -734,9 +831,39 @@ export default function App() {
         obj.evented = false;
       });
     } else {
+      const allObjects = canvas.getObjects();
+      const marqueeExists = allObjects.some((o: any) => o.isSelectionMask || o.id === 'selection-marquee');
+      const curActive = canvas.getActiveObject();
+
       canvas.forEachObject((obj: any) => {
-        obj.selectable = true;
-        obj.evented = true;
+        if (marqueeExists) {
+          if (obj === curActive && obj && !obj.isSelectionMask && obj.id !== 'selection-marquee') {
+            obj.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+            });
+          } else {
+            obj.set({
+              selectable: false,
+              evented: false,
+              hasControls: false,
+            });
+          }
+        } else {
+          if (obj.isSelectionMask || obj.id === 'selection-marquee') {
+            obj.set({
+              selectable: false,
+              evented: false,
+            });
+          } else {
+            obj.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+            });
+          }
+        }
       });
     }
 
@@ -824,6 +951,15 @@ export default function App() {
 
   // Modal actions dispatcher
   const handleCommand = (action: string) => {
+    const blockedWhileMarquee = [
+      'new-file', 'open-file', 'load-project', 'image-size', 'canvas-size', 
+      'start-crop', 'remove-bg', 'smart-analysis', 'add-emoji', 'meme-generator', 
+      'qr-generator', 'merge-layers', 'merge-all-layers', 'group'
+    ];
+    if (hasSelectionMarquee() && blockedWhileMarquee.includes(action)) {
+      showToast('선택 영역이 활성화되어 있어 이 작업을 수행할 수 없습니다. 선택 영역 해제(Ctrl+D) 후 다시 시도해 주세요.');
+      return;
+    }
     switch (action) {
       case 'new-file':
         setActiveModal('new-file');
@@ -1052,11 +1188,59 @@ export default function App() {
     setZoom(Math.max(bestScale, 0.15));
   };
 
+  const hasSelectionMarquee = (): boolean => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return false;
+    return canvas.getObjects().some((obj: any) => obj.isSelectionMask || obj.id === 'selection-marquee');
+  };
+
   // Synchronize layers state helper
   const syncLayersState = () => {
-    if (fabricCanvasRef.current) {
-      setLayers([...fabricCanvasRef.current.getObjects()]);
-      setActiveLayer(fabricCanvasRef.current.getActiveObject());
+    const canvas = fabricCanvasRef.current;
+    if (canvas) {
+      const allObjects = canvas.getObjects();
+      const marqueeExists = allObjects.some((o: any) => o.isSelectionMask || o.id === 'selection-marquee');
+      const curActive = canvas.getActiveObject();
+
+      canvas.forEachObject((obj: any) => {
+        if (marqueeExists) {
+          if (obj === curActive && obj && !obj.isSelectionMask && obj.id !== 'selection-marquee') {
+            obj.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+            });
+          } else {
+            obj.set({
+              selectable: false,
+              evented: false,
+              hasControls: false,
+            });
+          }
+        } else {
+          if (obj.isSelectionMask || obj.id === 'selection-marquee') {
+            obj.set({
+              selectable: false,
+              evented: false,
+            });
+          } else {
+            obj.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+            });
+          }
+        }
+      });
+
+      const visibleLayers = allObjects.filter((o: any) => !o.isSelectionMask && o.id !== 'selection-marquee');
+      setLayers([...visibleLayers]);
+
+      if (curActive && (curActive.isSelectionMask || curActive.id === 'selection-marquee')) {
+        setActiveLayer(null);
+      } else {
+        setActiveLayer(curActive);
+      }
     }
   };
 
@@ -1191,16 +1375,40 @@ export default function App() {
             height: canvas.height,
           });
 
-          selectionShape.clone((clonedMask: any) => {
-            clonedMask.set({
-              fill: 'black',
-              stroke: null,
-              strokeWidth: 0,
-              strokeDashArray: null,
-            });
-            tempFabricCanvasB.add(clonedMask);
-            tempFabricCanvasB.renderAll();
+          const drawMaskOnB = (callback: () => void) => {
+            if (selectionShape.pixelMaskBase64) {
+              fabric.Image.fromURL(selectionShape.pixelMaskBase64, (maskImg: any) => {
+                maskImg.set({
+                  left: selectionShape.left,
+                  top: selectionShape.top,
+                  scaleX: selectionShape.scaleX,
+                  scaleY: selectionShape.scaleY,
+                  angle: selectionShape.angle,
+                  skewX: selectionShape.skewX,
+                  skewY: selectionShape.skewY,
+                  flipX: selectionShape.flipX,
+                  flipY: selectionShape.flipY,
+                });
+                tempFabricCanvasB.add(maskImg);
+                tempFabricCanvasB.renderAll();
+                callback();
+              });
+            } else {
+              selectionShape.clone((clonedMask: any) => {
+                clonedMask.set({
+                  fill: 'black',
+                  stroke: null,
+                  strokeWidth: 0,
+                  strokeDashArray: null,
+                });
+                tempFabricCanvasB.add(clonedMask);
+                tempFabricCanvasB.renderAll();
+                callback();
+              });
+            }
+          };
 
+          drawMaskOnB(() => {
             // 3. Subtract mask (canvasB) from canvasA
             ctxA.globalCompositeOperation = 'destination-out';
             ctxA.drawImage(tempFabricCanvasB.getElement(), 0, 0);
@@ -1278,6 +1486,97 @@ export default function App() {
     }
   };
 
+  const getSelectedImageFromLayer = (targetLayer: any, selectionShape: any, callback: (dataURL: string) => void) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+
+    targetLayer.clone((clonedLayer: any) => {
+      // 1. Render clonedLayer onto Canvas A
+      const canvasA = document.createElement('canvas');
+      canvasA.width = canvas.width;
+      canvasA.height = canvas.height;
+      
+      const staticA = new fabric.StaticCanvas(null, { width: canvas.width, height: canvas.height });
+      staticA.add(clonedLayer);
+      staticA.renderAll();
+
+      // 2. Render Selection Shape onto Canvas B
+      const canvasB = document.createElement('canvas');
+      canvasB.width = canvas.width;
+      canvasB.height = canvas.height;
+      
+      const staticB = new fabric.StaticCanvas(null, { width: canvas.width, height: canvas.height });
+
+      const drawMaskOnB = () => {
+        const bounds = selectionShape.getBoundingRect();
+        const left = Math.max(0, Math.floor(bounds.left));
+        const top = Math.max(0, Math.floor(bounds.top));
+        const width = Math.min(canvas.width - left, Math.ceil(bounds.width));
+        const height = Math.min(canvas.height - top, Math.ceil(bounds.height));
+
+        if (width <= 0 || height <= 0) {
+          showToast('선택 영역이 비어있거나 올바르지 않습니다.');
+          return;
+        }
+
+        // 3. Composite A and B onto a new canvas C
+        const canvasC = document.createElement('canvas');
+        canvasC.width = canvas.width;
+        canvasC.height = canvas.height;
+        const ctxC = canvasC.getContext('2d');
+        if (ctxC) {
+          // Draw Canvas A (source)
+          ctxC.drawImage(staticA.getElement(), 0, 0);
+          
+          // destination-in: keeps source pixels that overlap with destination pixels (the mask)
+          ctxC.globalCompositeOperation = 'destination-in';
+          ctxC.drawImage(staticB.getElement(), 0, 0);
+
+          // Now crop to bounds
+          const cropCvs = document.createElement('canvas');
+          cropCvs.width = width;
+          cropCvs.height = height;
+          const cropCtx = cropCvs.getContext('2d');
+          if (cropCtx) {
+            cropCtx.drawImage(canvasC, left, top, width, height, 0, 0, width, height);
+            callback(cropCvs.toDataURL());
+          }
+        }
+      };
+
+      if (selectionShape.pixelMaskBase64) {
+        fabric.Image.fromURL(selectionShape.pixelMaskBase64, (maskImg: any) => {
+          maskImg.set({
+            left: selectionShape.left,
+            top: selectionShape.top,
+            scaleX: selectionShape.scaleX,
+            scaleY: selectionShape.scaleY,
+            angle: selectionShape.angle,
+            skewX: selectionShape.skewX,
+            skewY: selectionShape.skewY,
+            flipX: selectionShape.flipX,
+            flipY: selectionShape.flipY,
+          });
+          staticB.add(maskImg);
+          staticB.renderAll();
+          drawMaskOnB();
+        });
+      } else {
+        selectionShape.clone((clonedMask: any) => {
+          clonedMask.set({
+            fill: 'black',
+            stroke: null,
+            strokeWidth: 0,
+            strokeDashArray: null,
+          });
+          staticB.add(clonedMask);
+          staticB.renderAll();
+          drawMaskOnB();
+        });
+      }
+    });
+  };
+
   const handleSelectionAction = (action: 'copy' | 'cut' | 'delete' | 'fill') => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
@@ -1306,49 +1605,19 @@ export default function App() {
     }
 
     if (action === 'copy' || action === 'cut') {
-      activeObj.clone((clonedLayer: any) => {
-        selection.clone((clonedMask: any) => {
-          clonedMask.absolutePositioned = true;
-          clonedMask.fill = 'black';
-          clonedMask.stroke = null;
-          clonedMask.strokeDashArray = null;
+      getSelectedImageFromLayer(activeObj, selection, (dataURL) => {
+        const br = selection.getBoundingRect();
+        const left = Math.max(0, Math.floor(br.left));
+        const top = Math.max(0, Math.floor(br.top));
+        const width = Math.min(canvas.width - left, Math.ceil(br.width));
+        const height = Math.min(canvas.height - top, Math.ceil(br.height));
 
-          const tempCvs = new fabric.StaticCanvas(null, {
-            width: canvas.width,
-            height: canvas.height,
-          });
+        setClipboard({ type: 'image_data', source: dataURL, bounds: { left, top, width, height } });
+        showToast(action === 'copy' ? '선택 영역 복사 완료' : '선택 영역 잘라내기 완료');
 
-          clonedLayer.clipPath = clonedMask;
-          tempCvs.add(clonedLayer);
-          tempCvs.renderAll();
-
-          const br = selection.getBoundingRect();
-          const left = Math.max(0, br.left);
-          const top = Math.max(0, br.top);
-          const width = Math.min(canvas.width - left, br.width);
-          const height = Math.min(canvas.height - top, br.height);
-
-          if (width <= 0 || height <= 0) {
-            showToast('선택 영역이 유효하지 않습니다.');
-            return;
-          }
-
-          const dataURL = tempCvs.toDataURL({
-            left,
-            top,
-            width,
-            height,
-            format: 'png',
-            multiplier: 1,
-          });
-
-          setClipboard({ type: 'image_data', source: dataURL, bounds: { left, top, width, height } });
-          showToast(action === 'copy' ? '선택 영역 복사 완료' : '선택 영역 잘라내기 완료');
-
-          if (action === 'cut') {
-            eraseSelectionFromLayer(activeObj, selection);
-          }
-        });
+        if (action === 'cut') {
+          eraseSelectionFromLayer(activeObj, selection);
+        }
       });
     } else if (action === 'delete') {
       eraseSelectionFromLayer(activeObj, selection);
@@ -1833,6 +2102,10 @@ export default function App() {
   };
 
   const onDeleteLayerIndex = (index: number) => {
+    if (hasSelectionMarquee()) {
+      showToast('선택 영역이 활성화되어 있어 레이어를 삭제할 수 없습니다. 선택 영역 해제(Ctrl+D) 후 다시 시도해 주세요.');
+      return;
+    }
     const canvas = fabricCanvasRef.current;
     if (canvas) {
       const objects = canvas.getObjects();
@@ -1846,6 +2119,10 @@ export default function App() {
 
   // Reorder layer depths
   const onReorderLayers = (dragIdx: number, dropIdx: number) => {
+    if (hasSelectionMarquee()) {
+      showToast('선택 영역이 활성화되어 있어 레이어 순서를 변경할 수 없습니다. 선택 영역 해제(Ctrl+D) 후 다시 시도해 주세요.');
+      return;
+    }
     const canvas = fabricCanvasRef.current;
     if (canvas) {
       const obj = canvas.getObjects()[dragIdx];
@@ -2306,6 +2583,10 @@ export default function App() {
   };
 
   const onAddShapeIcon = (type: string) => {
+    if (hasSelectionMarquee()) {
+      showToast('선택 영역이 활성화되어 있어 아이콘을 추가할 수 없습니다. 선택 영역 해제(Ctrl+D) 후 다시 시도해 주세요.');
+      return;
+    }
     const iconMap: Record<string, string> = {
       heart: '❤️', diamond: '♦️', spade: '♠️', club: '♣️',
       star: '⭐', moon: '🌙', sun: '☀️', cloud: '☁️',
@@ -3488,6 +3769,10 @@ export default function App() {
   // Self helpers
 
   function updateActiveOpacity(val: number) {
+    if (hasSelectionMarquee()) {
+      showToast('선택 영역이 활성화되어 있어 투명도를 변경할 수 없습니다. 선택 영역 해제(Ctrl+D) 후 다시 시도해 주세요.');
+      return;
+    }
     const canvas = fabricCanvasRef.current;
     const obj = canvas?.getActiveObject();
     if (obj) {
@@ -3498,6 +3783,10 @@ export default function App() {
   }
 
   function onSelectLayer(layer: any) {
+    if (hasSelectionMarquee()) {
+      showToast('선택 영역이 활성화되어 있어 다른 레이어를 선택할 수 없습니다. 선택 영역 해제(Ctrl+D) 후 다시 시도해 주세요.');
+      return;
+    }
     const canvas = fabricCanvasRef.current;
     if (canvas) {
       canvas.setActiveObject(layer);
@@ -3507,6 +3796,10 @@ export default function App() {
   }
 
   function onToggleLayerVisibility(index: number) {
+    if (hasSelectionMarquee()) {
+      showToast('선택 영역이 활성화되어 있어 레이어 표시 여부를 가릴 수 없습니다. 선택 영역 해제(Ctrl+D) 후 다시 시도해 주세요.');
+      return;
+    }
     const canvas = fabricCanvasRef.current;
     if (canvas) {
       const obj = canvas.getObjects()[index];
