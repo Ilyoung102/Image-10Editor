@@ -938,108 +938,130 @@ export default function App() {
     }
 
     try {
-      // 1. We clone the object to get a clean copy with absolute coordinates,
-      // completely isolated from active selections, rendering borders, controls, or canvas-level zoom.
-      activeObj.clone((cloned: any) => {
+      let dataURL = '';
+
+      // Strategy 1: High-fidelity native object toDataURL (direct canvas-backed extraction)
+      // Works natively for single normal Fabric objects.
+      if (typeof activeObj.toDataURL === 'function' && activeObj.type !== 'activeSelection') {
         try {
-          if (!cloned) {
-            throw new Error('Cloned object is null');
-          }
-
-          // In case the cloned object is a group or active selection, associate its canvas context
-          if (cloned.type === 'activeSelection') {
-            cloned.canvas = canvas;
-          }
-
-          // 2. Generate standard high-resolution data URL from cloned, isolated object
-          const dataURL = cloned.toDataURL({
+          dataURL = activeObj.toDataURL({
             format: 'png',
-            multiplier: 2, // High resolution crisp export (2x)
+            multiplier: 2, // 2x crisp multiplier
           });
-
-          if (!dataURL) {
-            throw new Error('DataURL generation returned empty');
-          }
-
-          // 3. Immediately trigger immediate file download
-          const link = document.createElement('a');
-          link.download = 'Image_10editor.png';
-          link.href = dataURL;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          showToast('선택한 레이어가 Image_10editor.png 이미지로 바로 저장되었습니다.');
-        } catch (cloneExportErr) {
-          console.warn('Clone-based download failed, using fallback:', cloneExportErr);
-          fallbackCanvasCroppedExport(activeObj);
+        } catch (err1) {
+          console.warn('Strategy 1 direct toDataURL failed:', err1);
         }
-      });
-    } catch (err) {
-      console.warn('Clone failed, using fallback:', err);
-      fallbackCanvasCroppedExport(activeObj);
-    }
-  };
-
-  const fallbackCanvasCroppedExport = (activeObj: any) => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return;
-
-    try {
-      // Temporarily store selection, viewport, zoom, background state
-      const originalActive = canvas.getActiveObject();
-      canvas.discardActiveObject();
-
-      const originalBgColor = canvas.backgroundColor;
-      const originalBgImage = canvas.backgroundImage;
-      canvas.backgroundColor = 'transparent';
-      canvas.backgroundImage = null;
-
-      const originalZoom = canvas.getZoom();
-      const originalVP = canvas.viewportTransform ? [...canvas.viewportTransform] : null;
-
-      // Render at Zoom = 1, untransformed coordinates
-      canvas.setZoom(1);
-      canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
-      canvas.renderAll();
-
-      // Retrieve precise bounding rectangle
-      const rect = activeObj.getBoundingRect(true, true);
-
-      // Generate data URL of custom cropped canvas field directly
-      const dataURL = canvas.toDataURL({
-        format: 'png',
-        left: Math.max(0, rect.left),
-        top: Math.max(0, rect.top),
-        width: Math.min(canvas.width - rect.left, rect.width),
-        height: Math.min(canvas.height - rect.top, rect.height),
-        multiplier: 2,
-      });
-
-      // Restore stored canvas properties and selection
-      canvas.backgroundColor = originalBgColor;
-      canvas.backgroundImage = originalBgImage;
-      if (originalVP) canvas.viewportTransform = originalVP;
-      canvas.setZoom(originalZoom);
-
-      if (originalActive) {
-        canvas.setActiveObject(originalActive);
       }
-      canvas.renderAll();
+
+      // Strategy 2: Off-screen cropped render / visibility isolate.
+      // This is extremely robust and captures group, text, and active selections with precise styles and overlays.
+      if (!dataURL) {
+        // Find visual bounds on canvas
+        const rect = activeObj.getBoundingRect(true, true);
+
+        // De-select temporarily to prevent selection borders/controls from rendering in the exported PNG image
+        const originalActive = canvas.getActiveObject();
+        canvas.discardActiveObject();
+
+        const allObjects = canvas.getObjects();
+        const originalVisibilities = allObjects.map((obj: any) => ({
+          obj,
+          visible: obj.visible,
+        }));
+
+        // Keep only target active object (or internal selection objects) visible
+        const isSelection = activeObj.type === 'activeSelection';
+        const selectionObjects = isSelection ? activeObj._objects : [];
+
+        allObjects.forEach((obj: any) => {
+          if (obj === activeObj) {
+            obj.visible = true;
+          } else if (isSelection && selectionObjects.includes(obj)) {
+            obj.visible = true;
+          } else {
+            obj.visible = false;
+          }
+        });
+
+        // Clear canvas background during crop capture for clean transparent PNGrists
+        const originalBgColor = canvas.backgroundColor;
+        const originalBgImage = canvas.backgroundImage;
+        canvas.backgroundColor = 'transparent';
+        canvas.backgroundImage = null;
+
+        // Reset zoom & pan to 1:1 for absolute matching coordinates
+        const originalZoom = canvas.getZoom();
+        const originalVP = canvas.viewportTransform ? [...canvas.viewportTransform] : null;
+
+        canvas.setZoom(1);
+        canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+        canvas.renderAll();
+
+        // Safe coordinates within canvas bounds
+        const cropLeft = Math.max(0, Math.floor(rect.left));
+        const cropTop = Math.max(0, Math.floor(rect.top));
+        const cropWidth = Math.min(canvas.width - cropLeft, Math.ceil(rect.width));
+        const cropHeight = Math.min(canvas.height - cropTop, Math.ceil(rect.height));
+
+        if (cropWidth > 0 && cropHeight > 0) {
+          try {
+            dataURL = canvas.toDataURL({
+              format: 'png',
+              left: cropLeft,
+              top: cropTop,
+              width: cropWidth,
+              height: cropHeight,
+              multiplier: 2,
+            });
+          } catch (err2) {
+            console.warn('Strategy 2 cropped canvas fail:', err2);
+          }
+        }
+
+        // Restore original visibilities, background color & images, zoom, and active selection
+        originalVisibilities.forEach((item: any) => {
+          item.obj.visible = item.visible;
+        });
+        canvas.backgroundColor = originalBgColor;
+        canvas.backgroundImage = originalBgImage;
+
+        if (originalVP) canvas.viewportTransform = originalVP;
+        canvas.setZoom(originalZoom);
+
+        if (originalActive) {
+          canvas.setActiveObject(originalActive);
+        }
+        canvas.renderAll();
+      }
+
+      // Strategy 3: Ultimate Fallback (Export whole visible canvas structure if needed)
+      if (!dataURL) {
+        try {
+          dataURL = canvas.toDataURL({
+            format: 'png',
+            multiplier: 1,
+          });
+        } catch (err3) {
+          throw new Error('All image capture methods failed because of canvas or resource taint permissions.');
+        }
+      }
 
       if (!dataURL) {
-        throw new Error('Fallback dataURL empty');
+        throw new Error('Fallback empty dataURL string');
       }
 
+      // 4. Download immediately to local machine download folder as "Image_10editor.png"
       const link = document.createElement('a');
       link.download = 'Image_10editor.png';
       link.href = dataURL;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showToast('선택한 레이어가 Image_10editor.png 이미지로 바로 저장되었습니다.');
-    } catch (err: any) {
-      console.error('Fallback export failed:', err);
-      showToast('레이어 저장 오류: 파일 저장 권한 혹은 CORS 허용이 필요합니다.');
+
+      showToast('선택한 레이어가 Image_10editor.png 파일로 바로 다운로드되었습니다.');
+    } catch (saveErr: any) {
+      console.error('Save individual layer failed:', saveErr);
+      showToast('레이어 저장 중 무언가 잘못되었습니다. CORS 허용 또는 브라우저 설정을 확인해 주세요.');
     }
   };
 
