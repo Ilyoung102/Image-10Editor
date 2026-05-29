@@ -61,11 +61,20 @@ app.post('/api/ai/tutor-chat', async (req, res) => {
     // Prepare chat instruction context
     const systemInstruction = 'You are a warm, helpful, and professional AI Image Editor Tutor. Answer the user\'s question clearly in Korean, helping them master the application, handle layers, perform selections, and make artistic edits.';
 
+    const contents = (history || []).map((item: any) => ({
+      role: item.sender === 'user' ? 'user' : 'model',
+      parts: [{ text: item.text }]
+    }));
+
+    // Add the current user query to the contents history list
+    contents.push({
+      role: 'user',
+      parts: [{ text: text }]
+    });
+
     const response = await ai.models.generateContent({
       model: 'gemini-3.5-flash',
-      contents: [
-        { role: 'user', parts: [{ text: `User request: ${text}` }] }
-      ],
+      contents,
       config: {
         systemInstruction,
         temperature: 0.7,

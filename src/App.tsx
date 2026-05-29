@@ -904,6 +904,27 @@ export default function App() {
         e.preventDefault();
       }
 
+      // Tool selection shortcuts (triggered without modification keys)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'v') {
+          setActiveTool('select');
+          showToast('이동 도구(V) 선택');
+        } else if (key === 'm') {
+          setActiveTool((prev) => (prev === 'marquee-rect' ? 'marquee-ellipse' : 'marquee-rect'));
+          showToast('선택 도구(M) 선택');
+        } else if (key === 'w') {
+          setActiveTool('marquee-wand');
+          showToast('매직봉 도구(W) 선택');
+        } else if (key === 'j') {
+          setActiveTool('spot-healing');
+          showToast('스팟 복구 브러쉬(J) 선택');
+        } else if (key === 'b') {
+          setActiveTool('brush');
+          showToast('브러시 도구(B) 선택');
+        }
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         clearSelectionMarquee();
@@ -1244,7 +1265,6 @@ export default function App() {
     }
   };
 
-  // Save changes onto browser History list
   const saveHistory = (actionName = 'Action', specificProjId: string | null = null) => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
@@ -1258,17 +1278,24 @@ export default function App() {
       prev.map((p) => {
         if (p.id === targetProjId) {
           const step = p.historyStep + 1;
-          const freshHistory = p.history.slice(0, step);
+          let freshHistory = p.history.slice(0, step);
           freshHistory.push({
             json: serialized,
             name: actionName,
             time: new Date().toLocaleTimeString(),
           });
 
+          // Limit history items to prevent browser Out of Memory (OOM) crashes
+          const MAX_HISTORY_STEPS = 15;
+          if (freshHistory.length > MAX_HISTORY_STEPS) {
+            freshHistory = freshHistory.slice(freshHistory.length - MAX_HISTORY_STEPS);
+          }
+          const nextStep = freshHistory.length - 1;
+
           return {
             ...p,
             history: freshHistory,
-            historyStep: step,
+            historyStep: nextStep,
             json: serialized,
           };
         }
@@ -2620,7 +2647,7 @@ export default function App() {
     fabricCanvasRef.current.renderAll();
     syncLayersState();
     saveHistory(`Add Symbol (${type})`);
-    showToast(`${type} 아이콘이 레이어로 성골적으로 추가되었습니다.`);
+    showToast(`${type} 아이콘이 레이어로 성공적으로 추가되었습니다.`);
   };
 
   // --- Real Fullstack Gemini AI integrations handlers ---
