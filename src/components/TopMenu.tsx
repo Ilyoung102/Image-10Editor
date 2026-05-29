@@ -28,6 +28,7 @@ export default function TopMenu({ onCommand }: TopMenuProps) {
         { label: '실행 취소', shortcut: 'Ctrl+Z', action: 'undo' },
         { label: '다시 실행', shortcut: 'Ctrl+Y', action: 'redo' },
         { divider: true },
+        { label: '잘라내기', shortcut: 'Ctrl+X', action: 'cut' },
         { label: '복사', shortcut: 'Ctrl+C', action: 'copy' },
         { label: '붙여넣기', shortcut: 'Ctrl+V', action: 'paste' },
         { divider: true },

@@ -144,10 +144,6 @@ export default function App() {
   const cropperInstanceRef = useRef<any>(null);
   const cropImageRef = useRef<HTMLImageElement>(null);
 
-  // 11. Generative Fill Drag & Drop parameters
-  const [isGenFillActive, setIsGenFillActive] = useState(false);
-  const [genFillPrompt, setGenFillPrompt] = useState('');
-
   // DOM Refs
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -364,36 +360,20 @@ export default function App() {
         }
 
         path.set({
-          fill: 'rgba(0, 120, 215, 0.15)',
-          stroke: '#0078d7',
+          fill: 'rgba(79, 172, 254, 0.12)',
+          stroke: '#4facfe',
           strokeWidth: 1.5,
-          strokeDashArray: [4, 4],
+          strokeDashArray: [5, 5],
           selectable: false,
           evented: false,
           id: 'selection-marquee',
           isSelectionMask: true,
         });
 
-        const activeObj = canvas.getActiveObject();
-        if (activeObj) {
-          activeObj.clone((clonedMask: any) => {
-            clonedMask.set({
-              absolutePositioned: true,
-            });
-            path.set({
-              clipPath: clonedMask,
-            });
-            setActiveTool('select');
-            canvas.renderAll();
-            showToast('올가미 선택 영역이 완성되었습니다.');
-            syncState();
-          });
-        } else {
-          setActiveTool('select');
-          canvas.renderAll();
-          showToast('올가미 선택 영역이 완성되었습니다.');
-          syncState();
-        }
+        setActiveTool('select');
+        canvas.renderAll();
+        showToast('올가미 선택 영역이 완성되었습니다.');
+        syncState();
       } else if (currentTool === 'brush') {
         const marquee = canvas.getObjects().find((obj: any) => obj.isSelectionMask || obj.id === 'selection-marquee');
         if (marquee) {
@@ -437,10 +417,10 @@ export default function App() {
           top: pointer.y,
           width: 0,
           height: 0,
-          fill: 'rgba(0, 120, 215, 0.15)',
-          stroke: '#0078d7',
+          fill: 'rgba(79, 172, 254, 0.12)',
+          stroke: '#4facfe',
           strokeWidth: 1.5,
-          strokeDashArray: [4, 4],
+          strokeDashArray: [5, 5],
           selectable: false,
           evented: false,
         });
@@ -456,10 +436,10 @@ export default function App() {
           top: pointer.y,
           rx: 0,
           ry: 0,
-          fill: 'rgba(0, 120, 215, 0.15)',
-          stroke: '#0078d7',
+          fill: 'rgba(79, 172, 254, 0.12)',
+          stroke: '#4facfe',
           strokeWidth: 1.5,
-          strokeDashArray: [4, 4],
+          strokeDashArray: [5, 5],
           selectable: false,
           evented: false,
         });
@@ -493,10 +473,10 @@ export default function App() {
 
         if (pts.length > 2 && Math.hypot(pointer.x - pts[0].x, pointer.y - pts[0].y) < 15) {
           const poly = new fabric.Polygon(pts, {
-            fill: 'rgba(0,120,215,0.15)',
-            stroke: '#0078d7',
+            fill: 'rgba(79, 172, 254, 0.12)',
+            stroke: '#4facfe',
             strokeWidth: 1.5,
-            strokeDashArray: [4, 4],
+            strokeDashArray: [5, 5],
             selectable: false,
             evented: false,
             id: 'selection-marquee',
@@ -509,28 +489,11 @@ export default function App() {
           }
           polygonPointsRef.current = [];
 
-          const activeObj = canvas.getActiveObject();
-          if (activeObj) {
-            activeObj.clone((clonedMask: any) => {
-              clonedMask.set({
-                absolutePositioned: true,
-              });
-              poly.set({
-                clipPath: clonedMask,
-              });
-              canvas.add(poly);
-              setActiveTool('select');
-              canvas.renderAll();
-              showToast('다각형 선택 영역이 완성되었습니다.');
-              syncState();
-            });
-          } else {
-            canvas.add(poly);
-            setActiveTool('select');
-            canvas.renderAll();
-            showToast('다각형 선택 영역이 완성되었습니다.');
-            syncState();
-          }
+          canvas.add(poly);
+          setActiveTool('select');
+          canvas.renderAll();
+          showToast('다각형 선택 영역이 완성되었습니다.');
+          syncState();
         } else {
           pts.push({ x: pointer.x, y: pointer.y });
 
@@ -540,9 +503,9 @@ export default function App() {
 
           const tempPoly = new fabric.Polygon(pts, {
             fill: 'transparent',
-            stroke: '#0078d7',
+            stroke: '#4facfe',
             strokeWidth: 1.5,
-            strokeDashArray: [4, 4],
+            strokeDashArray: [5, 5],
             selectable: false,
             evented: false,
           });
@@ -600,9 +563,9 @@ export default function App() {
                       selectMaskData.data[i+2] = 255;
                       selectMaskData.data[i+3] = 255;
 
-                      visualData.data[i] = 0;
-                      visualData.data[i+1] = 120;
-                      visualData.data[i+2] = 215;
+                      visualData.data[i] = 79;
+                      visualData.data[i+1] = 172;
+                      visualData.data[i+2] = 254;
                       visualData.data[i+3] = 80;
                     }
                   }
@@ -616,9 +579,9 @@ export default function App() {
                     selectMaskData.data[idx + 2] = 255;
                     selectMaskData.data[idx + 3] = 255;
 
-                    visualData.data[idx] = 0;
-                    visualData.data[idx + 1] = 120;
-                    visualData.data[idx + 2] = 215;
+                    visualData.data[idx] = 79;
+                    visualData.data[idx + 1] = 172;
+                    visualData.data[idx + 2] = 254;
                     visualData.data[idx + 3] = 80;
 
                     const neighbors = [
@@ -656,8 +619,10 @@ export default function App() {
                   overlayImg.set({
                     left: clickedTarget.left,
                     top: clickedTarget.top,
-                    scaleX: clickedTarget.scaleX,
-                    scaleY: clickedTarget.scaleY,
+                    scaleX: clickedTarget.scaleX / scaleX,
+                    scaleY: clickedTarget.scaleY / scaleY,
+                    originX: clickedTarget.originX,
+                    originY: clickedTarget.originY,
                     angle: clickedTarget.angle,
                     skewX: clickedTarget.skewX,
                     skewY: clickedTarget.skewY,
@@ -730,26 +695,10 @@ export default function App() {
         });
         selectionShapeRef.current = null;
 
-        const activeObj = canvas.getActiveObject();
-        if (activeObj) {
-          activeObj.clone((clonedMask: any) => {
-            clonedMask.set({
-              absolutePositioned: true,
-            });
-            rectSel.set({
-              clipPath: clonedMask,
-            });
-            setActiveTool('select');
-            canvas.renderAll();
-            showToast('사각 선택 영역이 완성되었습니다.');
-            syncState();
-          });
-        } else {
-          setActiveTool('select');
-          canvas.renderAll();
-          showToast('사각 선택 영역이 완성되었습니다.');
-          syncState();
-        }
+        setActiveTool('select');
+        canvas.renderAll();
+        showToast('사각 선택 영역이 완성되었습니다.');
+        syncState();
       } else if (tool === 'marquee-ellipse') {
         const ellSel = selectionShapeRef.current;
         ellSel.set({
@@ -758,26 +707,10 @@ export default function App() {
         });
         selectionShapeRef.current = null;
 
-        const activeObj = canvas.getActiveObject();
-        if (activeObj) {
-          activeObj.clone((clonedMask: any) => {
-            clonedMask.set({
-              absolutePositioned: true,
-            });
-            ellSel.set({
-              clipPath: clonedMask,
-            });
-            setActiveTool('select');
-            canvas.renderAll();
-            showToast('원형 선택 영역이 완성되었습니다.');
-            syncState();
-          });
-        } else {
-          setActiveTool('select');
-          canvas.renderAll();
-          showToast('원형 선택 영역이 완성되었습니다.');
-          syncState();
-        }
+        setActiveTool('select');
+        canvas.renderAll();
+        showToast('원형 선택 영역이 완성되었습니다.');
+        syncState();
       } else if (tool === 'line-draw') {
         const line = selectionShapeRef.current;
         line.setCoords();
@@ -942,6 +875,10 @@ export default function App() {
         e.preventDefault();
         onCopy();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        onCut();
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault();
         onPaste();
@@ -1008,6 +945,9 @@ export default function App() {
         break;
       case 'copy':
         onCopy();
+        break;
+      case 'cut':
+        onCut();
         break;
       case 'paste':
         onPaste();
@@ -1415,6 +1355,8 @@ export default function App() {
                   skewY: selectionShape.skewY,
                   flipX: selectionShape.flipX,
                   flipY: selectionShape.flipY,
+                  originX: selectionShape.originX,
+                  originY: selectionShape.originY,
                 });
                 tempFabricCanvasB.add(maskImg);
                 tempFabricCanvasB.renderAll();
@@ -1583,6 +1525,8 @@ export default function App() {
             skewY: selectionShape.skewY,
             flipX: selectionShape.flipX,
             flipY: selectionShape.flipY,
+            originX: selectionShape.originX,
+            originY: selectionShape.originY,
           });
           staticB.add(maskImg);
           staticB.renderAll();
@@ -1619,6 +1563,17 @@ export default function App() {
             showToast('레이어가 복사되었습니다.');
           });
         }
+      } else if (action === 'cut') {
+        const activeObj = canvas.getActiveObject();
+        if (activeObj) {
+          activeObj.clone((cloned: any) => {
+            setClipboard(cloned);
+            showToast('레이어가 잘라내기 되었습니다.');
+            canvas.remove(activeObj);
+            syncLayersState();
+            saveHistory('Cut Layer');
+          });
+        }
       } else if (action === 'delete') {
         onDeleteLayer();
       }
@@ -1649,28 +1604,71 @@ export default function App() {
     } else if (action === 'delete') {
       eraseSelectionFromLayer(activeObj, selection);
     } else if (action === 'fill') {
-      selection.clone((clonedFill: any) => {
-        clonedFill.set({
-          fill: brushColorRef.current || '#000000',
-          stroke: null,
-          strokeDashArray: null,
-          selectable: true,
-          evented: true,
-          id: undefined,
-          isSelectionMask: false,
+      if (selection.pixelMaskBase64) {
+        fabric.Image.fromURL(selection.pixelMaskBase64, (maskImg: any) => {
+          const tempCvs = document.createElement('canvas');
+          tempCvs.width = maskImg.width;
+          tempCvs.height = maskImg.height;
+          const tempCtx = tempCvs.getContext('2d');
+          if (tempCtx) {
+            tempCtx.drawImage(maskImg.getElement(), 0, 0);
+            tempCtx.globalCompositeOperation = 'source-in';
+            tempCtx.fillStyle = brushColorRef.current || '#000000';
+            tempCtx.fillRect(0, 0, tempCvs.width, tempCvs.height);
+
+            fabric.Image.fromURL(tempCvs.toDataURL(), (filledImg: any) => {
+              filledImg.set({
+                left: selection.left,
+                top: selection.top,
+                scaleX: selection.scaleX,
+                scaleY: selection.scaleY,
+                originX: selection.originX,
+                originY: selection.originY,
+                angle: selection.angle,
+                skewX: selection.skewX,
+                skewY: selection.skewY,
+                flipX: selection.flipX,
+                flipY: selection.flipY,
+                selectable: true,
+                evented: true,
+              });
+              canvas.add(filledImg);
+              canvas.setActiveObject(filledImg);
+              canvas.renderAll();
+              syncLayersState();
+              showToast('선택 영역 채우기 완료');
+              saveHistory('Fill Selection');
+            });
+          }
         });
-        canvas.add(clonedFill);
-        canvas.setActiveObject(clonedFill);
-        canvas.renderAll();
-        syncLayersState();
-        showToast('선택 영역 채우기 완료');
-        saveHistory('Fill Selection');
-      });
+      } else {
+        selection.clone((clonedFill: any) => {
+          clonedFill.set({
+            fill: brushColorRef.current || '#000000',
+            stroke: null,
+            strokeDashArray: null,
+            selectable: true,
+            evented: true,
+            id: undefined,
+            isSelectionMask: false,
+          });
+          canvas.add(clonedFill);
+          canvas.setActiveObject(clonedFill);
+          canvas.renderAll();
+          syncLayersState();
+          showToast('선택 영역 채우기 완료');
+          saveHistory('Fill Selection');
+        });
+      }
     }
   };
 
   const onCopy = () => {
     handleSelectionAction('copy');
+  };
+
+  const onCut = () => {
+    handleSelectionAction('cut');
   };
 
   const onPaste = () => {
@@ -2330,11 +2328,11 @@ export default function App() {
       obj.setCoords();
     });
 
-    onApplyCanvasSize(w, h, 0, 0);
+    onApplyCanvasSize(w, h, 0, 0, true);
     saveHistory('Image Scale Adjustment');
   };
 
-  const onApplyCanvasSize = (w: number, h: number, anchorX: number, anchorY: number) => {
+  const onApplyCanvasSize = (w: number, h: number, anchorX: number, anchorY: number, skipHistory = false) => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
 
@@ -2359,7 +2357,9 @@ export default function App() {
 
     setTimeout(() => {
       fitCanvasViewport();
-      saveHistory('Canvas Resize');
+      if (!skipHistory) {
+        saveHistory('Canvas Resize');
+      }
     }, 100);
   };
 
@@ -2519,7 +2519,7 @@ export default function App() {
       shapeObj = new fabric.Path('M 10 0 L 90 0 C 95 0, 100 5, 100 10 L 100 60 C 100 65, 95 70, 90 70 L 35 70 L 20 90 L 25 70 L 10 70 C 5 70, 0 65, 0 60 L 0 10 C 0 5, 5 0, 10 0 Z', {
         ...center,
         fill: '#ffffff',
-        stroke: '#33333s',
+        stroke: '#333333',
         strokeWidth: 2,
       });
     } else if (type === 'taeguk') {
@@ -2963,12 +2963,60 @@ export default function App() {
     const dataUrl = cropperInstanceRef.current.getCroppedCanvas().toDataURL();
     const canvas = fabricCanvasRef.current;
     const oldImage = canvas.getActiveObject();
+    if (!oldImage) return;
+
+    const cropData = cropperInstanceRef.current.getData();
+    const x = cropData.x;
+    const y = cropData.y;
+    const croppedWidth = cropData.width;
+    const croppedHeight = cropData.height;
+
+    // Calculate original and new center differences
+    const origCenterX = oldImage.width / 2;
+    const origCenterY = oldImage.height / 2;
+
+    const cropCenterX = x + croppedWidth / 2;
+    const cropCenterY = y + croppedHeight / 2;
+
+    let shiftLocalX = cropCenterX - origCenterX;
+    let shiftLocalY = cropCenterY - origCenterY;
+
+    if (oldImage.flipX) shiftLocalX = -shiftLocalX;
+    if (oldImage.flipY) shiftLocalY = -shiftLocalY;
+
+    const shiftScaledX = shiftLocalX * oldImage.scaleX;
+    const shiftScaledY = shiftLocalY * oldImage.scaleY;
+
+    // Rotate local shift vector to global canvas space
+    const angleRad = (oldImage.angle || 0) * Math.PI / 180;
+    const shiftGlobalX = shiftScaledX * Math.cos(angleRad) - shiftScaledY * Math.sin(angleRad);
+    const shiftGlobalY = shiftScaledX * Math.sin(angleRad) + shiftScaledY * Math.cos(angleRad);
+
+    const newLeft = oldImage.left + shiftGlobalX;
+    const newTop = oldImage.top + shiftGlobalY;
 
     fabric.Image.fromURL(dataUrl, (img: any) => {
       img.set({
-        left: oldImage.left,
-        top: oldImage.top,
+        originX: 'center',
+        originY: 'center',
+        left: newLeft,
+        top: newTop,
+        scaleX: oldImage.scaleX,
+        scaleY: oldImage.scaleY,
+        angle: oldImage.angle,
+        skewX: oldImage.skewX,
+        skewY: oldImage.skewY,
+        flipX: oldImage.flipX,
+        flipY: oldImage.flipY,
+        opacity: oldImage.opacity,
+        globalCompositeOperation: oldImage.globalCompositeOperation,
       });
+
+      if (oldImage.filters) {
+        img.filters = [...oldImage.filters];
+        img.applyFilters();
+      }
+
       canvas.remove(oldImage);
       canvas.add(img);
       canvas.setActiveObject(img);
